@@ -1,0 +1,24 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_imagemetadatavc_name": {
+            "value": null
+        },
+        "storageAccounts_vc2022_externalid": {
+            "value": null
+        },
+        "connections_azureblob_externalid": {
+            "value": null
+        },
+        "connections_azureeventgrid_externalid": {
+            "value": null
+        },
+        "connections_cognitiveservicescomputervision_4_externalid": {
+            "value": null
+        },
+        "connections_documentdb_externalid": {
+            "value": null
+        }
+    }
+}

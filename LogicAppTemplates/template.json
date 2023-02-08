@@ -1,0 +1,210 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_imagemetadatavc_name": {
+            "defaultValue": "imagemetadatavc",
+            "type": "String"
+        },
+        "storageAccounts_vc2022_externalid": {
+            "defaultValue": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/resourceGroups/mssa-rg/providers/Microsoft.Storage/storageAccounts/vc2022",
+            "type": "String"
+        },
+        "connections_azureblob_externalid": {
+            "defaultValue": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/resourceGroups/mssa-rg/providers/Microsoft.Web/connections/azureblob",
+            "type": "String"
+        },
+        "connections_azureeventgrid_externalid": {
+            "defaultValue": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/resourceGroups/mssa-rg/providers/Microsoft.Web/connections/azureeventgrid",
+            "type": "String"
+        },
+        "connections_cognitiveservicescomputervision_4_externalid": {
+            "defaultValue": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/resourceGroups/mssa-rg/providers/Microsoft.Web/connections/cognitiveservicescomputervision-4",
+            "type": "String"
+        },
+        "connections_documentdb_externalid": {
+            "defaultValue": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/resourceGroups/mssa-rg/providers/Microsoft.Web/connections/documentdb",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "Microsoft.Logic/workflows",
+            "apiVersion": "2017-07-01",
+            "name": "[parameters('workflows_imagemetadatavc_name')]",
+            "location": "eastus",
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "When_a_resource_event_occurs": {
+                            "splitOn": "@triggerBody()",
+                            "type": "ApiConnectionWebhook",
+                            "inputs": {
+                                "body": {
+                                    "properties": {
+                                        "destination": {
+                                            "endpointType": "webhook",
+                                            "properties": {
+                                                "endpointUrl": "@{listCallbackUrl()}"
+                                            }
+                                        },
+                                        "filter": {
+                                            "includedEventTypes": [
+                                                "Microsoft.Storage.BlobCreated"
+                                            ],
+                                            "subjectBeginsWith": "/blobServices/default/containers/images"
+                                        },
+                                        "topic": "[parameters('storageAccounts_vc2022_externalid')]"
+                                    }
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azureeventgrid']['connectionId']"
+                                    }
+                                },
+                                "path": "/subscriptions/@{encodeURIComponent('46028f71-3f52-412a-8de2-1e80dd06896d')}/providers/@{encodeURIComponent('Microsoft.Storage.StorageAccounts')}/resource/eventSubscriptions",
+                                "queries": {
+                                    "x-ms-api-version": "2017-09-15-preview"
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Analyze_Image": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "url": "@{triggerBody()?['data']?['Url']}"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['cognitiveservicescomputervision']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/vision/v2.0/analyze",
+                                "queries": {
+                                    "format": "Image URL",
+                                    "language": "en",
+                                    "visualFeatures": "Tags,Description,Categories"
+                                }
+                            }
+                        },
+                        "Create_blob_(V2)": {
+                            "runAfter": {
+                                "Generate_Thumbnail_(V3)": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": "@body('Generate_Thumbnail_(V3)')",
+                                "headers": {
+                                    "ReadFileMetadataFromServer": true
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['azureblob']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/v2/datasets/@{encodeURIComponent(encodeURIComponent('AccountNameFromSettings'))}/files",
+                                "queries": {
+                                    "folderPath": "/thumbnails",
+                                    "name": "@{last(split(triggerBody()?['subject'],'/'))}",
+                                    "queryParametersSingleEncoded": true
+                                }
+                            },
+                            "runtimeConfiguration": {
+                                "contentTransfer": {
+                                    "transferMode": "Chunked"
+                                }
+                            }
+                        },
+                        "Create_or_update_document_(V3)": {
+                            "runAfter": {
+                                "Analyze_Image": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "id": "@{last(split(triggerBody()?['subject'],'/'))}",
+                                    "result": "@{body('Analyze_Image')}"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['documentdb']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/v2/cosmosdb/@{encodeURIComponent('imagemetadata')}/dbs/@{encodeURIComponent('imagedb')}/colls/@{encodeURIComponent('metadata')}/docs"
+                            }
+                        },
+                        "Generate_Thumbnail_(V3)": {
+                            "runAfter": {},
+                            "type": "ApiConnection",
+                            "inputs": {
+                                "body": {
+                                    "url": "@{triggerBody()?['data']?['Url']}"
+                                },
+                                "host": {
+                                    "connection": {
+                                        "name": "@parameters('$connections')['cognitiveservicescomputervision']['connectionId']"
+                                    }
+                                },
+                                "method": "post",
+                                "path": "/v3/subdomain/@{encodeURIComponent(encodeURIComponent('autoFilledSubdomain'))}/vision/v2.0/generateThumbnail",
+                                "queries": {
+                                    "format": "Image URL",
+                                    "height": 600,
+                                    "smartCropping": true,
+                                    "width": 600
+                                }
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "azureblob": {
+                                "connectionId": "[parameters('connections_azureblob_externalid')]",
+                                "connectionName": "azureblob",
+                                "id": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/providers/Microsoft.Web/locations/eastus/managedApis/azureblob"
+                            },
+                            "azureeventgrid": {
+                                "connectionId": "[parameters('connections_azureeventgrid_externalid')]",
+                                "connectionName": "azureeventgrid",
+                                "id": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/providers/Microsoft.Web/locations/eastus/managedApis/azureeventgrid"
+                            },
+                            "cognitiveservicescomputervision": {
+                                "connectionId": "[parameters('connections_cognitiveservicescomputervision_4_externalid')]",
+                                "connectionName": "cognitiveservicescomputervision-4",
+                                "id": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/providers/Microsoft.Web/locations/eastus/managedApis/cognitiveservicescomputervision"
+                            },
+                            "documentdb": {
+                                "connectionId": "[parameters('connections_documentdb_externalid')]",
+                                "connectionName": "documentdb",
+                                "id": "/subscriptions/46028f71-3f52-412a-8de2-1e80dd06896d/providers/Microsoft.Web/locations/eastus/managedApis/documentdb"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

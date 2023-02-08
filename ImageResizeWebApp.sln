@@ -7,6 +7,12 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ImageResizeWebApp", "ImageR
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SmartCropvc", "SmartCropvc\SmartCropvc.csproj", "{C5E60F35-9949-42DE-A899-53CDEA649CDA}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "LogicApp", "LogicApp", "{5E407C31-264B-42BD-B589-CCBF1C7FB5D7}"
+	ProjectSection(SolutionItems) = preProject
+		..\Users\User\Downloads\ExportedTemplate-mssa-rg\parameters.json = ..\Users\User\Downloads\ExportedTemplate-mssa-rg\parameters.json
+		..\Users\User\Downloads\ExportedTemplate-mssa-rg\template.json = ..\Users\User\Downloads\ExportedTemplate-mssa-rg\template.json
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

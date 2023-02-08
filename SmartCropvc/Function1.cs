@@ -31,7 +31,6 @@ namespace SmartCropvc
             var thumbContainerName = System.Environment.GetEnvironmentVariable("thumbnailContainerName");
             var createdEvent = eventGridEvent.Data.ToObjectFromJson<StorageBlobCreatedEventData>();
 
-
             HttpClient client = new HttpClient();
             client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", cs_key);
             var body = new { url = createdEvent.Url };
@@ -43,7 +42,8 @@ namespace SmartCropvc
            
             var blobName = GetBlobNameFromUrl(createdEvent.Url);
             log.LogInformation($"blobName {blobName}");
-            await blobContainerClient.UploadBlobAsync(blobName, await response.Content.ReadAsStreamAsync());
+            
+            await blobContainerClient.GetBlobClient(blobName).UploadAsync(await response.Content.ReadAsStreamAsync());
             log.LogInformation($"{blobName} created in {blobContainerClient.Uri}");
 
 

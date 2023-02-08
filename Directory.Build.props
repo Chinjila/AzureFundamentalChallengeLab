@@ -1,0 +1,6 @@
+<Project>
+    <PropertyGroup>
+        <TargetFrameworkVersion>net6.0</TargetFrameworkVersion>
+		<AzureStorageBlobsVersion>12.14.1</AzureStorageBlobsVersion>
+    </PropertyGroup>
+</Project>
